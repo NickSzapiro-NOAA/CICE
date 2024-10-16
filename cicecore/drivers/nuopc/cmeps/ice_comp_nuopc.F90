@@ -55,6 +55,9 @@ module ice_comp_nuopc
   use ice_mesh_mod       , only : ice_mesh_init_tlon_tlat_area_hm, ice_mesh_create_scolumn
   use ice_prescribed_mod , only : ice_prescribed_init
   use ice_scam           , only : scol_valid, single_column
+#ifndef CESMCOUPLED
+  use shr_is_restart_fh_mod, only : init_is_restart_fh, is_restart_fh, write_restartfh
+#endif
 
   implicit none
   private
@@ -1175,6 +1178,11 @@ contains
        endif
     endif
 
+#ifndef CESMCOUPLED
+    write_restartfh = is_restart_fh(clock)
+    if (write_restartfh) force_restart_now = .true.
+#endif
+
     !--------------------------------
     ! Unpack import state
     !--------------------------------
@@ -1289,6 +1297,7 @@ contains
     character(len=256)       :: stop_option    ! Stop option units
     integer                  :: stop_n         ! Number until stop interval
     integer                  :: stop_ymd       ! Stop date (YYYYMMDD)
+    integer                  :: dtime
     type(ESMF_ALARM)         :: stop_alarm
     character(len=128)       :: name
     integer                  :: alarmcount
@@ -1378,6 +1387,12 @@ contains
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
     end if
+
+#ifndef CESMCOUPLED
+    call ESMF_TimeIntervalGet( dtimestep, s=dtime, rc=rc )
+    if (ChkErr(rc,__LINE__,u_FILE_u)) return
+    call init_is_restart_fh(mcurrTime, dtime, my_task == master_task)
+#endif
 
     !--------------------------------
     ! Advance model clock to trigger alarms then reset model clock back to currtime
