@@ -1386,13 +1386,13 @@ contains
        call ESMF_AlarmSet(stop_alarm, clock=mclock, rc=rc)
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
-    end if
-
 #ifndef CESMCOUPLED
-    call ESMF_TimeIntervalGet( dtimestep, s=dtime, rc=rc )
-    if (ChkErr(rc,__LINE__,u_FILE_u)) return
-    call init_is_restart_fh(mcurrTime, dtime, my_task == master_task)
+      call ESMF_TimeIntervalGet( dtimestep, s=dtime, rc=rc )
+      if (ChkErr(rc,__LINE__,u_FILE_u)) return
+      call init_is_restart_fh(mcurrTime, dtime, my_task == master_task)
 #endif
+
+    end if
 
     !--------------------------------
     ! Advance model clock to trigger alarms then reset model clock back to currtime
