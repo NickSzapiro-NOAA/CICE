@@ -56,7 +56,7 @@ module ice_comp_nuopc
   use ice_prescribed_mod , only : ice_prescribed_init
   use ice_scam           , only : scol_valid, single_column
 #ifndef CESMCOUPLED
-  use shr_is_restart_fh_mod, only : init_is_restart_fh, is_restart_fh, write_restartfh
+  use shr_is_restart_fh_mod, only : init_is_restart_fh, is_restart_fh, is_restart_fh_type
 #endif
 
   implicit none
@@ -99,6 +99,9 @@ module ice_comp_nuopc
   logical                      :: mastertask
   logical                      :: runtimelog = .false.
   logical                      :: restart_eor = .false. !End of run restart flag
+#ifndef CESMCOUPLED
+  type(is_restart_fh_type)     :: restartfh_info     ! For flexible restarts in UFS
+#endif
   integer                      :: start_ymd          ! Start date (YYYYMMDD)
   integer                      :: start_tod          ! start time of day (s)
   integer                      :: curr_ymd           ! Current date (YYYYMMDD)
@@ -1027,6 +1030,7 @@ contains
     character(char_len_long)   :: restart_date
     character(char_len_long)   :: restart_filename
     logical                    :: isPresent, isSet
+    logical                    :: write_restartfh
     character(len=*),parameter :: subname=trim(modName)//':(ModelAdvance) '
     character(char_len_long)   :: msgString
     !--------------------------------
@@ -1179,7 +1183,7 @@ contains
     endif
 
 #ifndef CESMCOUPLED
-    write_restartfh = is_restart_fh(clock)
+    call is_restart_fh(clock, restartfh_info, write_restartfh)
     if (write_restartfh) force_restart_now = .true.
 #endif
 
@@ -1389,7 +1393,7 @@ contains
 #ifndef CESMCOUPLED
       call ESMF_TimeIntervalGet( dtimestep, s=dtime, rc=rc )
       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-      call init_is_restart_fh(mcurrTime, dtime, my_task == master_task)
+      call init_is_restart_fh(mcurrTime, dtime, my_task == master_task, restartfh_info)
 #endif
 
     end if
