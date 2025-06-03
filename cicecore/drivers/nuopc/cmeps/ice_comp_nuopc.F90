@@ -1395,9 +1395,7 @@ contains
        if (ChkErr(rc,__LINE__,u_FILE_u)) return
 
 #ifndef CESMCOUPLED
-       call ESMF_TimeIntervalGet( dtimestep, s=dtime, rc=rc )
-       if (ChkErr(rc,__LINE__,u_FILE_u)) return
-       call init_is_restart_fh(mcurrTime, dtime, my_task == master_task, restartfh_info)
+       call init_is_restart_fh(mclock, my_task == master_task, restartfh_info)
 #endif
     end if
 
