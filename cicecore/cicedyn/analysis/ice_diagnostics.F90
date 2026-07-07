@@ -207,11 +207,11 @@
          work1, work2      ! temporary
 
       real (kind=dbl_kind), parameter :: &
-         maxval_spval = -0.9_dbl_kind*HUGE(0.0_dbl_kind)  ! spval to detect
+         maxval_spval = -0.9_dbl_kind*1.0e36_dbl_kind  ! spval to detect
                  ! undefined values returned from global_maxval.  if global_maxval
                  ! is applied to a region that does not exist (for instance
                  ! southern hemisphere in box cases), global_maxval
-                 ! returns -HUGE which we want to avoid writing.  The
+                 ! returns -1.0e36 which we want to avoid writing.  The
                  ! return value is checked against maxval_spval before writing.
 
       character(len=*), parameter :: subname = '(runtime_diags)'
@@ -1722,7 +1722,7 @@
 
       subroutine debug_ice(iblk, plabeld)
 
-      character (char_len), intent(in) :: plabeld
+      character (len=*), intent(in) :: plabeld
       integer (kind=int_kind), intent(in) :: iblk
 
       ! local
@@ -1772,7 +1772,7 @@
           fsens, flat, evap, flwout, swvdr, swvdf, swidr, swidf, rhoa, &
           frzmlt, sst, sss, Tf, Tref, Qref, Uref, uocn, vocn, strtltxU, strtltyU
 
-      character (len=20), intent(in) :: plabel
+      character (len=*), intent(in) :: plabel
 
       integer (kind=int_kind), intent(in) :: &
           i, j       , & ! horizontal indices
@@ -1791,7 +1791,7 @@
       logical (kind=log_kind) :: tr_fsd, tr_iso, tr_snow
 
       type (block) :: &
-         this_block           ! block information for current block
+           this_block    ! block information for current block
 
       character(len=*), parameter :: subname = '(print_state)'
 
