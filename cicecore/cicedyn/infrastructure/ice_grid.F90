@@ -3616,7 +3616,7 @@
 
       subroutine NElatlon
 
-      use ice_constants, only: c0, c1, c1p5, c2, c4, p5, &
+      use ice_constants, only: c0, c1, c1p5, c2, p5, &
           field_loc_center, field_loc_Nface, field_loc_Eface, &
           field_type_scalar
 
