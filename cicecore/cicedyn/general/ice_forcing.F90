@@ -5202,7 +5202,7 @@
 ! authors: Elizabeth Hunke, LANL
 
       use ice_domain, only: nblocks, blocks_ice
-      use ice_blocks, only: block, get_block, nx_block, ny_block, nghost
+      use ice_blocks, only: block, get_block, nx_block, ny_block
       use ice_flux, only: uocn, vocn
 
       ! local parameters
@@ -5448,7 +5448,7 @@
           sec6hr          , & ! number of seconds in 3 hours
           secday              ! number of seconds in day
 
-      logical (kind=log_kind) :: readm, read6,debug_n_d
+      logical (kind=log_kind) :: read6,debug_n_d
 
       real(kind=dbl_kind), dimension(nfreq) :: &
          wave_spectrum_profile  ! wave spectrum
