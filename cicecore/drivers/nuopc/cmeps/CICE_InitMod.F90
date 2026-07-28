@@ -73,7 +73,7 @@ contains
 
     use ice_arrays_column    , only: hin_max, c_hi_range
     use ice_arrays_column    , only: floe_rad_l, floe_rad_c, floe_binwidth, c_fsd_range
-    use ice_calendar         , only: dt, write_ic, init_calendar, calendar
+    use ice_calendar         , only: dt, init_calendar, calendar
     use ice_communicate      , only: my_task, master_task
     use ice_diagnostics      , only: init_diags
     use ice_domain_size      , only: nfreq
