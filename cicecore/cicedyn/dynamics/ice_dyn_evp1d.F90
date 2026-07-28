@@ -81,7 +81,7 @@ module ice_dyn_evp1d
     real(kind=dbl_kind)   , allocatable, dimension(:,:) :: G_dyT, G_dxT, G_uarear
     logical(kind=log_kind), allocatable, dimension(:,:) :: G_tmask
 
-    integer(kind=int_kind) :: ios, ierr
+    integer(kind=int_kind) :: ierr
 
     character(len=*), parameter :: subname = '(dyn_evp1d_init)'
 
@@ -1161,7 +1161,7 @@ module ice_dyn_evp1d
 
      integer(kind=int_kind) :: iw, i, j
      integer(kind=int_kind), dimension(1:na0) :: &
-        Iin, Iee, Ine, Ise, Inw, Isw, Isse, indi, indj
+        Iin, Iee, Ine, Ise, Inw, Isw, Isse
 
      integer(kind=int_kind), dimension(1:7 * na0) :: util1, util2
 
