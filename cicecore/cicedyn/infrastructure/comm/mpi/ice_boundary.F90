@@ -9088,7 +9088,7 @@ contains
      i,j,n,iblk,ii,jj,   &! dummy loop indices
      ilo,ihi,jlo,jhi,    &! active block indices
      numBlocks,          &! number of local blocks
-     blockID             &! block location
+     blockID              ! block location
 
    type (block) :: &
      this_block  ! block info for current block
