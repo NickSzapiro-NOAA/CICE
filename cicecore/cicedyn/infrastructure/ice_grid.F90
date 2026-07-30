@@ -2127,7 +2127,7 @@
 
       integer (kind=int_kind) :: &
          i, j, &
-         im1, im2, jm1, jm2, &  ! i & j for mom supergrid
+         im1, im2, jm1, jm2, jm3, &  ! i & j for mom supergrid
          ierr
 
       character(len=*), parameter :: subname = '(mom_dy)'
