@@ -1421,7 +1421,7 @@
 
       integer (kind=int_kind) :: &
          k,            & ! indices
-         mm            & ! n_algae
+         mm              ! n_algae
 
       logical (kind=log_kind) :: diag
 
