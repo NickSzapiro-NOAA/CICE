@@ -85,7 +85,7 @@
       ! local variables
 
       integer (kind=int_kind) :: i,j,k,n,nn, &
-         ncid,status,kmtidi,kmtids,kmtidb,cmtid,timid, &
+         status,kmtidi,kmtids,kmtidb,cmtid,timid, &
          nvertexid,ivertex,kmtida,fmtid,lhistprec
       integer (kind=int_kind), dimension(2) :: dimid2
       integer (kind=int_kind), dimension(3) :: dimid3
@@ -1413,7 +1413,7 @@
       real (kind=dbl_kind), dimension(:,:,:,:),   allocatable :: work3
       real (kind=dbl_kind), dimension(:,:,:,:,:), allocatable :: work4
 
-      integer (kind=int_kind) :: i,j,k,n,nn,ns,ncid,status
+      integer (kind=int_kind) :: i,j,k,n,nn,ns,status
       logical (kind=log_kind) :: exists
       character (char_len_long) :: ncfile
       character (len=1) :: cns
