@@ -261,9 +261,8 @@
       use ice_arrays_column, only: Cdn_ocn
       use ice_boundary, only: ice_halo, ice_HaloMask, ice_HaloUpdate, &
           ice_HaloDestroy, ice_HaloUpdate_stress
-      use ice_blocks, only: block, get_block, nx_block, ny_block
-      use ice_domain, only: nblocks, blocks_ice, halo_info, maskhalo_dyn, &
-          ns_boundary_type
+      use ice_blocks, only: block, get_block, nx_block, ny_block, ns_boundary_type
+      use ice_domain, only: nblocks, blocks_ice, halo_info, maskhalo_dyn
       use ice_domain_size, only: max_blocks
       use ice_flux, only: rdg_conv, rdg_shear, strairxT, strairyT, &
           strairxU, strairyU, uocn, vocn, ss_tltx, ss_tlty, fmU, &
