@@ -207,11 +207,11 @@
          work1, work2      ! temporary
 
       real (kind=dbl_kind), parameter :: &
-         maxval_spval = -0.9_dbl_kind*HUGE(0.0_dbl_kind)  ! spval to detect
+         maxval_spval = -0.9_dbl_kind*1.0e36_dbl_kind  ! spval to detect
                  ! undefined values returned from global_maxval.  if global_maxval
                  ! is applied to a region that does not exist (for instance
                  ! southern hemisphere in box cases), global_maxval
-                 ! returns -HUGE which we want to avoid writing.  The
+                 ! returns -1.0e36 which we want to avoid writing.  The
                  ! return value is checked against maxval_spval before writing.
 
       character(len=*), parameter :: subname = '(runtime_diags)'
@@ -1951,8 +1951,6 @@
 
       use ice_blocks, only: block, get_block
       use ice_domain, only: blocks_ice
-      use ice_grid, only: TLAT, TLON
-      use ice_state, only: aice
 
       integer (kind=int_kind), intent(in) :: &
          istop, jstop, & ! indices of grid cell where model aborts

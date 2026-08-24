@@ -21,7 +21,8 @@
        add_mpi_barriers, ice_barrier
    use ice_broadcast, only: broadcast_scalar, broadcast_array
    use ice_blocks, only: block, get_block, create_blocks, nghost, &
-       nblocks_x, nblocks_y, nblocks_tot, nx_block, ny_block, debug_blocks
+       nblocks_x, nblocks_y, nblocks_tot, nx_block, ny_block, debug_blocks, &
+       ew_boundary_type, ns_boundary_type
    use ice_distribution, only: distrb
    use ice_boundary, only: ice_halo
    use ice_exit, only: abort_ice
@@ -55,9 +56,14 @@
    type (ice_halo), public :: &
       halo_info          ! ghost cell update info
 
-   character (char_len), public :: &
-      ew_boundary_type, &! type of domain bndy in each logical
-      ns_boundary_type   !    direction (ew is i, ns is j)
+   integer (kind=int_kind), parameter, public :: &
+      max_set_boundary_flds = 10
+
+   integer (kind=int_kind), public :: &
+      num_set_boundary_flds
+
+   character (char_len), dimension(max_set_boundary_flds), public :: &
+      set_boundary_flds   ! set outer halo for these fields
 
    logical (kind=log_kind), public :: &
       maskhalo_dyn   , & ! if true, use masked halo updates for dynamics
@@ -113,8 +119,8 @@
 !----------------------------------------------------------------------
 
    integer (int_kind) :: &
-      nml_error, &          ! namelist read error flag
-      nprocs_x, nprocs_y    ! procs decomposed into blocks
+      n, &                  ! counter
+      nml_error             ! namelist read error flag
 
    character(len=char_len)      :: nml_name ! text namelist name
    character(len=char_len_long) :: tmpstr2 ! for namelist check
@@ -139,6 +145,7 @@
                          distribution_wght_file, &
                          ew_boundary_type,  &
                          ns_boundary_type,  &
+                         set_boundary_flds, &
                          maskhalo_dyn,      &
                          maskhalo_remap,    &
                          maskhalo_bound,    &
@@ -158,6 +165,7 @@
    distribution_wght_file = 'unknown'
    ew_boundary_type  = 'cyclic'
    ns_boundary_type  = 'open'
+   set_boundary_flds = ''
    maskhalo_dyn      = .false.     ! if true, use masked halos for dynamics
    maskhalo_remap    = .false.     ! if true, use masked halos for transport
    maskhalo_bound    = .false.     ! if true, use masked halos for bound_state
@@ -213,6 +221,9 @@
    call broadcast_scalar(distribution_wght_file, master_task)
    call broadcast_scalar(ew_boundary_type,  master_task)
    call broadcast_scalar(ns_boundary_type,  master_task)
+   do n = 1,max_set_boundary_flds
+      call broadcast_scalar(set_boundary_flds(n), master_task)
+   enddo
    call broadcast_scalar(maskhalo_dyn,      master_task)
    call broadcast_scalar(maskhalo_remap,    master_task)
    call broadcast_scalar(maskhalo_bound,    master_task)
@@ -247,6 +258,29 @@
        ns_boundary_type /= 'linear_extrap')  then
       call abort_ice(subname//' ERROR: ns_boundary_type unsupported = '//trim(ns_boundary_type), file=__FILE__, line=__LINE__)
    endif
+
+   do n = 1,max_set_boundary_flds
+      if (set_boundary_flds(n) /= ''      .and. &
+          set_boundary_flds(n) /= 'none'  .and. &
+          set_boundary_flds(n) /= 'state' .and. &
+          set_boundary_flds(n) /= 'aicen' .and. &
+          set_boundary_flds(n) /= 'vicen' .and. &
+          set_boundary_flds(n) /= 'vsnon' .and. &
+          set_boundary_flds(n) /= 'trcrn' .and. &
+          set_boundary_flds(n) /= 'velocity') then
+         call abort_ice(subname//' ERROR: set_boundary_flds unsupported = '//trim(set_boundary_flds(n)), file=__FILE__, line=__LINE__)
+      endif
+   enddo
+
+   ! "compress" set_boundary_flds data
+   num_set_boundary_flds = 0
+   do n = 1,max_set_boundary_flds
+      if (set_boundary_flds(n) /= '' .and. set_boundary_flds(n) /= 'none') then
+         num_set_boundary_flds = num_set_boundary_flds + 1
+         set_boundary_flds(num_set_boundary_flds) = set_boundary_flds(n)
+      endif
+   enddo
+   set_boundary_flds(num_set_boundary_flds+1:max_set_boundary_flds) = ''
 
 !----------------------------------------------------------------------
 !
@@ -313,6 +347,9 @@
      write(nu_diag,'(a,a)')   '  Distribution wght file= ', trim(distribution_wght_file)
      write(nu_diag,'(a,a)')   '  ew_boundary_type      = ', trim(ew_boundary_type)
      write(nu_diag,'(a,a)')   '  ns_boundary_type      = ', trim(ns_boundary_type)
+     do n = 1,num_set_boundary_flds
+        write(nu_diag,'(a,a)')   '  set_boundary_flds     = ', trim(set_boundary_flds(n))
+     enddo
      write(nu_diag,'(a,l6)')  '  maskhalo_dyn          = ', maskhalo_dyn
      write(nu_diag,'(a,l6)')  '  maskhalo_remap        = ', maskhalo_remap
      write(nu_diag,'(a,l6)')  '  maskhalo_bound        = ', maskhalo_bound
@@ -357,8 +394,6 @@
    integer (int_kind), dimension (nx_global, ny_global) :: &
       flat                 ! latitude-dependent scaling factor
 
-   character (char_len) :: outstring
-
    integer (int_kind), parameter :: &
       max_work_unit=10    ! quantize the work into values from 1,max
 
@@ -375,7 +410,6 @@
       status             ,&! netcdf return code
 #endif
       tblocks_tmp        ,&! total number of blocks
-      nblocks_tmp        ,&! temporary value of nblocks
       nblocks_max          ! max blocks on proc
 
    real (dbl_kind) :: &
@@ -688,9 +722,9 @@
 !----------------------------------------------------------------------
 
    ! update ghost cells on all four boundaries
-   halo_info = ice_HaloCreate(distrb_info,     &
-                        trim(ns_boundary_type),     &
-                        trim(ew_boundary_type),     &
+   halo_info = ice_HaloCreate(distrb_info,       &
+                        trim(ns_boundary_type),  &
+                        trim(ew_boundary_type),  &
                         nx_global)
 
 !----------------------------------------------------------------------

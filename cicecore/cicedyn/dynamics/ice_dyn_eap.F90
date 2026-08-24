@@ -121,6 +121,7 @@
       use ice_grid, only: tmask, umask, dxT, dyT, dxU, dyU, &
           tarear, uarear, grid_average_X2Y, &
           grid_atm_dynu, grid_atm_dynv, grid_ocn_dynu, grid_ocn_dynv
+      use ice_restoring, only: ice_restoring_halo
       use ice_state, only: aice, aiU, vice, vsno, uvel, vvel, divu, shear, vort, &
           aice_init, aice0, aicen, vicen, strength
       use ice_timers, only: timer_dynamics, timer_bound, &
@@ -519,6 +520,8 @@
          endif
          call ice_timer_stop(timer_bound)
          call unstack_fields(fld2, uvel, vvel)
+
+         call ice_restoring_halo(setfld='velocity')
 
       enddo                     ! subcycling
 
@@ -1611,7 +1614,7 @@
          sgprm11, sgprm12, sgprm22, &
          Angle_denom_gamma,  Angle_denom_alpha, &
          Tany_1, Tany_2, &
-         x, y, dx, dy, da, &
+         x, y, dx, &
          dtemp1, dtemp2, atempprime, &
          kxw, kyw, kaw
 
@@ -2086,11 +2089,11 @@
 
       subroutine read_restart_eap()
 
-      use ice_blocks, only: nghost
+      use ice_blocks, only: nghost, ns_boundary_type
       use ice_boundary, only: ice_HaloUpdate_stress
       use ice_constants, only:  &
           field_loc_center, field_type_scalar
-      use ice_domain, only: nblocks, halo_info, ns_boundary_type
+      use ice_domain, only: nblocks, halo_info
       use ice_restart, only: read_restart_field
 
       ! local variables

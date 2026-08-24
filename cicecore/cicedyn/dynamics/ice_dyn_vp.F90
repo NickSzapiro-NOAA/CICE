@@ -118,9 +118,6 @@
 
       use ice_blocks, only: get_block, block
       use ice_boundary, only: ice_HaloUpdate
-      use ice_constants, only: c1, &
-          field_loc_center, field_type_scalar
-      use ice_domain, only: blocks_ice
       use ice_calendar, only: dt_dyn
       use ice_dyn_shared, only: init_dyn_shared
 
@@ -154,10 +151,10 @@
       use ice_arrays_column, only: Cdn_ocn
       use ice_boundary, only: ice_HaloMask, ice_HaloUpdate, &
           ice_HaloDestroy, ice_HaloUpdate_stress
-      use ice_blocks, only: block, get_block, nx_block, ny_block
-      use ice_domain, only: blocks_ice, halo_info, maskhalo_dyn, &
+      use ice_blocks, only: block, get_block, nx_block, ny_block, &
           ns_boundary_type
-      use ice_domain_size, only: max_blocks, ncat
+      use ice_domain, only: blocks_ice, halo_info, maskhalo_dyn
+      use ice_domain_size, only: max_blocks
       use ice_dyn_shared, only: deformations, iceTmask, iceUmask, &
           cxp, cyp, cxm, cym
       use ice_flux, only: rdg_conv, rdg_shear, strairxT, strairyT, &
@@ -682,6 +679,7 @@
       use ice_grid, only: dxT, dyT, uarear
       use ice_dyn_shared, only: DminTarea, dxhy, dyhx, cxp, cyp, cxm, cym
       use ice_state, only: uvel, vvel, strength
+      use ice_restoring, only: ice_restoring_halo
       use ice_timers, only: ice_timer_start, ice_timer_stop, timer_bound
 
       integer (kind=int_kind), intent(in) :: &
@@ -1092,6 +1090,8 @@
          call ice_timer_stop(timer_bound)
          call unstack_fields(fld2, uvel, vvel)
 
+         call ice_restoring_halo(setfld='velocity')
+
          ! Compute "progress" residual norm
          !$OMP PARALLEL DO PRIVATE(iblk)
          do iblk = 1, nblocks
@@ -1128,8 +1128,7 @@
                                 zetax2  , etax2   , &
                                 rep_prs , stPr)
 
-      use ice_dyn_shared, only: strain_rates, visc_replpress, &
-                                capping
+      use ice_dyn_shared, only: strain_rates, visc_replpress
 
       integer (kind=int_kind), intent(in) :: &
          nx_block, ny_block, & ! block dimensions
@@ -2441,7 +2440,6 @@
                             field_x , field_y ) &
                result(norm)
 
-      use ice_domain, only: distrb_info
       use ice_domain_size, only: max_blocks
 
       integer (kind=int_kind), intent(in) :: &
@@ -2462,12 +2460,6 @@
          norm      ! l^2 norm of vector field
 
       ! local variables
-
-      integer (kind=int_kind) :: &
-         i, j, ij, iblk
-
-      real (kind=dbl_kind), dimension (nx_block,ny_block,max_blocks) :: &
-         squared      ! temporary array for summed squared components
 
       character(len=*), parameter :: subname = '(global_norm)'
 
@@ -2490,7 +2482,8 @@
                                    vector2_x , vector2_y) &
                result(dot_product)
 
-      use ice_domain, only: distrb_info, ns_boundary_type
+      use ice_blocks, only: ns_boundary_type
+      use ice_domain, only: distrb_info
       use ice_domain_size, only: max_blocks
       use ice_fileunits, only: bfbflag
 

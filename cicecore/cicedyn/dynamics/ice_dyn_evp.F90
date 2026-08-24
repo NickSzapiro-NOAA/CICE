@@ -127,10 +127,10 @@
 ! Elastic-viscous-plastic dynamics driver
 !
       subroutine init_evp
-      use ice_blocks, only: get_block, nx_block, ny_block, nghost, block
+      use ice_blocks, only: get_block, nx_block, ny_block, block
       use ice_domain_size, only: max_blocks
       use ice_domain, only: nblocks, blocks_ice
-      use ice_grid, only: grid_ice, dyT, dxT, uarear, tmask, G_HTE, G_HTN, dxN, dyE
+      use ice_grid, only: grid_ice, dxN, dyE
       use ice_calendar, only: dt_dyn
       use ice_dyn_shared, only: init_dyn_shared, evp_algorithm
       use ice_dyn_evp1d, only: dyn_evp1d_init
@@ -261,10 +261,9 @@
       use ice_arrays_column, only: Cdn_ocn
       use ice_boundary, only: ice_halo, ice_HaloMask, ice_HaloUpdate, &
           ice_HaloDestroy, ice_HaloUpdate_stress
-      use ice_blocks, only: block, get_block, nx_block, ny_block, nghost
-      use ice_domain, only: nblocks, blocks_ice, halo_info, maskhalo_dyn, &
-          ns_boundary_type
-      use ice_domain_size, only: max_blocks, ncat
+      use ice_blocks, only: block, get_block, nx_block, ny_block, ns_boundary_type
+      use ice_domain, only: nblocks, blocks_ice, halo_info, maskhalo_dyn
+      use ice_domain_size, only: max_blocks
       use ice_flux, only: rdg_conv, rdg_shear, strairxT, strairyT, &
           strairxU, strairyU, uocn, vocn, ss_tltx, ss_tlty, fmU, &
           strtltxU, strtltyU, strocnxU, strocnyU, strintxU, strintyU, taubxU, taubyU, &
@@ -285,6 +284,7 @@
           dxE, dxN, dxT, dxU, dyE, dyN, dyT, dyU, &
           tarear, uarear, earear, narear, grid_average_X2Y, uarea, &
           grid_ice, grid_atm_dynu, grid_atm_dynv, grid_ocn_dynu, grid_ocn_dynv
+      use ice_restoring, only: ice_restoring_halo
       use ice_state, only: aice, aiU, vice, vsno, uvel, vvel, uvelN, vvelN, &
           uvelE, vvelE, divu, shear, vort, &
           aice_init, aice0, aicen, vicen, strength
@@ -907,6 +907,7 @@
                call dyn_haloUpdate (halo_info,          halo_info_mask,    &
                                     field_loc_NEcorner, field_type_vector, &
                                     uvel, vvel)
+               call ice_restoring_halo(setfld='velocity')
 
             enddo  ! sub cycling
          endif ! evp algorithm
@@ -1094,6 +1095,7 @@
             call dyn_haloUpdate (halo_info,          halo_info_mask,    &
                                  field_loc_NEcorner, field_type_vector, &
                                  uvel, vvel)
+            call ice_restoring_halo(setfld='velocity')
 
          enddo                     ! subcycling
 
@@ -1285,6 +1287,7 @@
             call dyn_haloUpdate (halo_info,          halo_info_mask,    &
                                  field_loc_NEcorner, field_type_vector, &
                                  uvel, vvel)
+            call ice_restoring_halo(setfld='velocity')
 
          enddo                     ! subcycling
 
