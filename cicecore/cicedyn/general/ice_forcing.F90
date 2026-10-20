@@ -19,7 +19,6 @@
       module ice_forcing
 
       use ice_kinds_mod
-      use ice_boundary, only: ice_HaloUpdate
       use ice_blocks, only: nx_block, ny_block
       use ice_domain, only: halo_info
       use ice_domain_size, only: ncat, max_blocks, nx_global, ny_global, nfreq
@@ -34,7 +33,7 @@
                                 ice_open_nc, ice_read_nc, ice_close_nc
       use ice_timers, only: ice_timer_start, ice_timer_stop, timer_readwrite, &
                             timer_bound, timer_forcing
-      use ice_arrays_column, only: oceanmixed_ice, restore_bgc
+      use ice_arrays_column, only: oceanmixed_ice
       use ice_constants, only: c0, c1, c2, c3, c4, c5, c8, c10, c12, c15, c20, &
                                c180, c360, c365, c1000, c3600
       use ice_constants, only: p001, p01, p1, p2, p25, p5, p6
@@ -160,11 +159,8 @@
       logical (kind=log_kind), public :: &
          restore_ocn                 ! restore sst if true
 
-      integer (kind=int_kind), public :: &
-         trestore                    ! restoring time scale (days)
-
       real (kind=dbl_kind), public :: &
-         trest                       ! restoring time scale (sec)
+         trestore                    ! restoring time scale (days)
 
       logical (kind=log_kind), public :: &
          debug_forcing               ! prints forcing debugging output if true
@@ -187,6 +183,9 @@
          snw_drdt0_fname     ! snow table 3d drdt0 field name
 
       ! PRIVATE:
+
+      real (dbl_kind) :: &
+         frestore        ! restoring value based on trestore (0.-1.)
 
       real (dbl_kind), parameter :: &
          mixed_layer_depth_default = c20  ! default mixed layer depth in m
@@ -411,11 +410,11 @@
 
       nbits = 64              ! double precision data
 
-      if (restore_ocn .or. restore_bgc) then
-         if (trestore == 0) then
-            trest = dt        ! use data instantaneously
+      if (restore_ocn) then
+         if (trestore == c0) then
+            frestore = c1      ! use data instantaneously
          else
-            trest = real(trestore,kind=dbl_kind) * secday ! seconds
+            frestore = min(dt/(trestore*secday),c1)
          endif
       endif
 
@@ -730,17 +729,6 @@
 
       enddo                     ! iblk
       !$OMP END PARALLEL DO
-
-      call ice_timer_start(timer_bound)
-      call ice_HaloUpdate (swvdr,             halo_info, &
-                           field_loc_center,  field_type_scalar, fillvalue=c0)
-      call ice_HaloUpdate (swvdf,             halo_info, &
-                           field_loc_center,  field_type_scalar, fillvalue=c0)
-      call ice_HaloUpdate (swidr,             halo_info, &
-                           field_loc_center,  field_type_scalar, fillvalue=c0)
-      call ice_HaloUpdate (swidf,             halo_info, &
-                           field_loc_center,  field_type_scalar, fillvalue=c0)
-      call ice_timer_stop(timer_bound)
 
       call ice_timer_stop(timer_forcing)
 
@@ -3629,7 +3617,7 @@
             do j = 1, ny_block
             do i = 1, nx_block
                sst(i,j,iblk) = sst(i,j,iblk)  &
-                         + (sstdat(i,j,iblk)-sst(i,j,iblk))*dt/trest
+                         + (sstdat(i,j,iblk)-sst(i,j,iblk))*frestore
             enddo
             enddo
          enddo
@@ -4085,7 +4073,7 @@
       if (restore_ocn) then
         do j = 1, ny_block
          do i = 1, nx_block
-           sst(i,j,:) = sst(i,j,:) + (work1(i,j,:)-sst(i,j,:))*dt/trest
+           sst(i,j,:) = sst(i,j,:) + (work1(i,j,:)-sst(i,j,:))*frestore
          enddo
         enddo
 !     else sst is only updated in ice_ocean.F
@@ -4288,7 +4276,7 @@
             do j = 1, ny_block
             do i = 1, nx_block
                sst(i,j,iblk) = sst(i,j,iblk)  &
-                         + (sstdat(i,j,iblk)-sst(i,j,iblk))*dt/trest
+                         + (sstdat(i,j,iblk)-sst(i,j,iblk))*frestore
             enddo
             enddo
          enddo
@@ -4839,14 +4827,6 @@
          uatm_data_p, vatm_data_p
 
       real (kind=dbl_kind), parameter :: & ! coefficients for Hyland-Wexler Qa
-         ps1 = 0.58002206e4_dbl_kind,    & ! (K)
-         ps2 = 1.3914993_dbl_kind,       & !
-         ps3 = 0.48640239e-1_dbl_kind,   & ! (K^-1)
-         ps4 = 0.41764768e-4_dbl_kind,   & ! (K^-2)
-         ps5 = 0.14452093e-7_dbl_kind,   & ! (K^-3)
-         ps6 = 6.5459673_dbl_kind,       & !
-         ws1 = 621.97_dbl_kind,          & ! for saturation mixing ratio
-         Pair = 1020._dbl_kind,          & ! Sea level pressure (hPa)
          lapse_rate = 0.0065_dbl_kind      ! (K/m) lapse rate over sea level
 
       ! for interpolation of hourly data
@@ -5222,7 +5202,7 @@
 ! authors: Elizabeth Hunke, LANL
 
       use ice_domain, only: nblocks, blocks_ice
-      use ice_blocks, only: block, get_block, nx_block, ny_block, nghost
+      use ice_blocks, only: block, get_block, nx_block, ny_block
       use ice_flux, only: uocn, vocn
 
       ! local parameters
@@ -5386,8 +5366,6 @@
       use ice_timers, only: ice_timer_start, ice_timer_stop, timer_fsd
 
       ! local variables
-      integer (kind=int_kind) :: &
-         fid                    ! file id for netCDF routines
 
       real(kind=dbl_kind), dimension(nfreq) :: &
          wave_spectrum_profile  ! wave spectrum
@@ -5451,44 +5429,31 @@
 
       use ice_blocks, only: block, get_block
       use ice_global_reductions, only: global_minval, global_maxval
-      use ice_domain, only: nblocks, distrb_info, blocks_ice
       use ice_arrays_column, only: wave_spectrum, &
                                    dwavefreq, wavefreq
       use ice_read_write, only: ice_read_nc_xyf
-      use ice_grid, only: hm, tlon, tlat, tmask, umask
       use ice_calendar, only: days_per_year, use_leap_years
 
       integer (kind=int_kind) :: &
           ncid        , & ! netcdf file id
-          i, j, freq  , &
           ixm,ixx,ixp , & ! record numbers for neighboring months
           recnum      , & ! record number
           maxrec      , & ! maximum record number
           recslot     , & ! spline slot for current record
-          midmonth    , & ! middle day of month
           dataloc     , & ! = 1 for data located in middle of time interval
                           ! = 2 for date located at end of time interval
-          iblk        , & ! block index
-          ilo,ihi,jlo,jhi, & ! beginning and end of physical domain
           yr              ! current forcing year
 
       real (kind=dbl_kind) :: &
           sec6hr          , & ! number of seconds in 3 hours
-          secday          , & ! number of seconds in day
-          vmin, vmax
+          secday              ! number of seconds in day
 
-      logical (kind=log_kind) :: readm, read6,debug_n_d
-
-      type (block) :: &
-         this_block           ! block information for current block
+      logical (kind=log_kind) :: read6,debug_n_d
 
       real(kind=dbl_kind), dimension(nfreq) :: &
          wave_spectrum_profile  ! wave spectrum
 
-      character(len=64) :: fieldname !netcdf field name
       character(char_len_long) :: spec_file
-      character(char_len) :: wave_spec_type
-      logical (kind=log_kind) :: wave_spec
       character(len=*), parameter :: subname = '(wave_spec_data)'
 
       debug_n_d = .false.  !usually false

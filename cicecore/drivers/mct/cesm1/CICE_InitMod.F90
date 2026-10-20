@@ -70,7 +70,7 @@
           init_calendar, advance_timestep, calc_timesteps
       use ice_communicate, only: init_communicate, my_task, master_task
       use ice_diagnostics, only: init_diags
-      use ice_domain, only: init_domain_blocks
+      use ice_domain, only: init_domain_blocks, num_set_boundary_flds
       use ice_domain_size, only: ncat, nfsd
       use ice_dyn_eap, only: init_eap
       use ice_dyn_evp, only: init_evp
@@ -84,11 +84,12 @@
           faero_default, alloc_forcing_bgc, fiso_default
       use ice_grid, only: init_grid1, init_grid2, alloc_grid, dealloc_grid
       use ice_history, only: init_hist, accum_hist
+      use ice_history_write, only: ice_read_hist
       use ice_restart_shared, only: restart, runtype
       use ice_init, only: input_data, init_state
       use ice_init_column, only: init_thermo_vertical, init_shortwave, init_zbgc, input_zbgc, count_tracers
       use ice_kinds_mod
-      use ice_restoring, only: ice_HaloRestore_init
+      use ice_restoring, only: restore_ice, ice_restoring_init
       use ice_timers, only: timer_total, init_ice_timers, ice_timer_start
       use ice_transport_driver, only: init_transport
 
@@ -170,7 +171,7 @@
       call init_forcing_ocn(dt) ! initialize sss and sst from data
       call init_state           ! initialize the ice state
       call init_transport       ! initialize horizontal transport
-      call ice_HaloRestore_init ! restored boundary conditions
+      if (restore_ice .or. num_set_boundary_flds > 0) call ice_restoring_init ! restoring on boundary or interior
 
       call icepack_query_parameters(skl_bgc_out=skl_bgc, z_tracers_out=z_tracers, &
           wave_spec_out=wave_spec, snw_aging_table_out=snw_aging_table)
@@ -200,6 +201,7 @@
          call init_shortwave    ! initialize radiative transfer
 
       if (write_ic) call accum_hist(dt) ! write initial conditions
+      call ice_read_hist  ! read history restarts
 
 !      call advance_timestep()
 

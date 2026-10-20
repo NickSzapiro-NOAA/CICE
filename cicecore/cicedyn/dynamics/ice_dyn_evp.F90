@@ -67,6 +67,7 @@
          forcexN  (:,:,:) , & ! work array: combined atm stress and ocn tilt, x
          forceyN  (:,:,:) , & ! work array: combined atm stress and ocn tilt, y
          aiN      (:,:,:) , & ! ice fraction on N-grid
+         rheofactN(:,:,:) , & ! mult. factor = 1, set to 0 if aiN <= rheo_area_min
          nmass    (:,:,:) , & ! total mass of ice and snow (N grid)
          nmassdti (:,:,:)     ! mass of N-cell/dte (kg/m^2 s)
 ! all c or d
@@ -81,6 +82,7 @@
          forcexE  (:,:,:) , & ! work array: combined atm stress and ocn tilt, x
          forceyE  (:,:,:) , & ! work array: combined atm stress and ocn tilt, y
          aiE      (:,:,:) , & ! ice fraction on E-grid
+         rheofactE(:,:,:) , & ! mult. factor = 1, set to 0 if aiE <= rheo_area_min
          emass    (:,:,:) , & ! total mass of ice and snow (E grid)
          emassdti (:,:,:)     ! mass of E-cell/dte (kg/m^2 s)
 
@@ -125,10 +127,10 @@
 ! Elastic-viscous-plastic dynamics driver
 !
       subroutine init_evp
-      use ice_blocks, only: get_block, nx_block, ny_block, nghost, block
+      use ice_blocks, only: get_block, nx_block, ny_block, block
       use ice_domain_size, only: max_blocks
       use ice_domain, only: nblocks, blocks_ice
-      use ice_grid, only: grid_ice, dyT, dxT, uarear, tmask, G_HTE, G_HTN, dxN, dyE
+      use ice_grid, only: grid_ice, dxN, dyE
       use ice_calendar, only: dt_dyn
       use ice_dyn_shared, only: init_dyn_shared, evp_algorithm
       use ice_dyn_evp1d, only: dyn_evp1d_init
@@ -167,7 +169,6 @@
                 stat=ierr)
       if (ierr/=0) call abort_ice(subname//' ERROR: Out of memory B-Grid evp')
 
-
       if (grid_ice == 'CD' .or. grid_ice == 'C') then
 
          allocate( strengthU(nx_block,ny_block,max_blocks), &
@@ -194,6 +195,7 @@
                    aiN      (nx_block,ny_block,max_blocks), &
                    nmass    (nx_block,ny_block,max_blocks), &
                    nmassdti (nx_block,ny_block,max_blocks), &
+                   rheofactN(nx_block,ny_block,max_blocks), &
                    stat=ierr)
          if (ierr/=0) call abort_ice(subname//' ERROR: Out of memory N evp')
 
@@ -209,6 +211,7 @@
                    aiE      (nx_block,ny_block,max_blocks), &
                    emass    (nx_block,ny_block,max_blocks), &
                    emassdti (nx_block,ny_block,max_blocks), &
+                   rheofactE(nx_block,ny_block,max_blocks), &
                    stat=ierr)
          if (ierr/=0) call abort_ice(subname//' ERROR: Out of memory E evp')
 
@@ -258,10 +261,9 @@
       use ice_arrays_column, only: Cdn_ocn
       use ice_boundary, only: ice_halo, ice_HaloMask, ice_HaloUpdate, &
           ice_HaloDestroy, ice_HaloUpdate_stress
-      use ice_blocks, only: block, get_block, nx_block, ny_block, nghost
-      use ice_domain, only: nblocks, blocks_ice, halo_info, maskhalo_dyn, &
-          ns_boundary_type
-      use ice_domain_size, only: max_blocks, ncat
+      use ice_blocks, only: block, get_block, nx_block, ny_block, ns_boundary_type
+      use ice_domain, only: nblocks, blocks_ice, halo_info, maskhalo_dyn
+      use ice_domain_size, only: max_blocks
       use ice_flux, only: rdg_conv, rdg_shear, strairxT, strairyT, &
           strairxU, strairyU, uocn, vocn, ss_tltx, ss_tlty, fmU, &
           strtltxU, strtltyU, strocnxU, strocnyU, strintxU, strintyU, taubxU, taubyU, &
@@ -282,6 +284,7 @@
           dxE, dxN, dxT, dxU, dyE, dyN, dyT, dyU, &
           tarear, uarear, earear, narear, grid_average_X2Y, uarea, &
           grid_ice, grid_atm_dynu, grid_atm_dynv, grid_ocn_dynu, grid_ocn_dynv
+      use ice_restoring, only: ice_restoring_halo
       use ice_state, only: aice, aiU, vice, vsno, uvel, vvel, uvelN, vvelN, &
           uvelE, vvelE, divu, shear, vort, &
           aice_init, aice0, aicen, vicen, strength
@@ -634,7 +637,7 @@
                             stress12_3(:,:,iblk), stress12_4(:,:,iblk), &
                             uvelN_init(:,:,iblk), vvelN_init(:,:,iblk), &
                             uvelN     (:,:,iblk), vvelN     (:,:,iblk), &
-                            TbN       (:,:,iblk))
+                            TbN       (:,:,iblk), rheofactN (:,:,iblk))
 
             !-----------------------------------------------------------------
             ! more preparation for dynamics on E grid
@@ -667,8 +670,7 @@
                             stress12_3(:,:,iblk), stress12_4(:,:,iblk), &
                             uvelE_init(:,:,iblk), vvelE_init(:,:,iblk), &
                             uvelE     (:,:,iblk), vvelE     (:,:,iblk), &
-                            TbE       (:,:,iblk))
-
+                            TbE       (:,:,iblk), rheofactE (:,:,iblk))
 
             do i=1,nx_block
             do j=1,ny_block
@@ -905,6 +907,7 @@
                call dyn_haloUpdate (halo_info,          halo_info_mask,    &
                                     field_loc_NEcorner, field_type_vector, &
                                     uvel, vvel)
+               call ice_restoring_halo(setfld='velocity')
 
             enddo  ! sub cycling
          endif ! evp algorithm
@@ -1016,7 +1019,7 @@
                                    indxEi      (:,iblk), indxEj      (:,iblk), &
                                    dxE       (:,:,iblk), dyE       (:,:,iblk), &
                                    dxU       (:,:,iblk), dyT       (:,:,iblk), &
-                                   earear    (:,:,iblk)                      , &
+                                   earear    (:,:,iblk), rheofactE (:,:,iblk), &
                                    stresspT  (:,:,iblk), stressmT  (:,:,iblk), &
                                    stress12U (:,:,iblk), strintxE  (:,:,iblk)  )
 
@@ -1025,7 +1028,7 @@
                                    indxNi      (:,iblk), indxNj      (:,iblk), &
                                    dxN       (:,:,iblk), dyN       (:,:,iblk), &
                                    dxT       (:,:,iblk), dyU       (:,:,iblk), &
-                                   narear    (:,:,iblk)                      , &
+                                   narear    (:,:,iblk), rheofactN (:,:,iblk), &
                                    stresspT  (:,:,iblk), stressmT  (:,:,iblk), &
                                    stress12U (:,:,iblk), strintyN  (:,:,iblk)  )
 
@@ -1092,6 +1095,7 @@
             call dyn_haloUpdate (halo_info,          halo_info_mask,    &
                                  field_loc_NEcorner, field_type_vector, &
                                  uvel, vvel)
+            call ice_restoring_halo(setfld='velocity')
 
          enddo                     ! subcycling
 
@@ -1198,7 +1202,7 @@
                                    indxEi      (:,iblk), indxEj      (:,iblk), &
                                    dxE       (:,:,iblk), dyE       (:,:,iblk), &
                                    dxU       (:,:,iblk), dyT       (:,:,iblk), &
-                                   earear    (:,:,iblk)                      , &
+                                   earear    (:,:,iblk), rheofactE (:,:,iblk), &
                                    stresspT  (:,:,iblk), stressmT  (:,:,iblk), &
                                    stress12U (:,:,iblk), strintxE  (:,:,iblk)  )
 
@@ -1207,7 +1211,7 @@
                                    indxEi      (:,iblk), indxEj      (:,iblk), &
                                    dxE       (:,:,iblk), dyE       (:,:,iblk), &
                                    dxU       (:,:,iblk), dyT       (:,:,iblk), &
-                                   earear    (:,:,iblk)                      , &
+                                   earear    (:,:,iblk), rheofactE (:,:,iblk), &
                                    stresspU  (:,:,iblk), stressmU  (:,:,iblk), &
                                    stress12T (:,:,iblk), strintyE  (:,:,iblk)  )
 
@@ -1216,7 +1220,7 @@
                                    indxNi      (:,iblk), indxNj      (:,iblk), &
                                    dxN       (:,:,iblk), dyN       (:,:,iblk), &
                                    dxT       (:,:,iblk), dyU       (:,:,iblk), &
-                                   narear    (:,:,iblk)                      , &
+                                   narear    (:,:,iblk), rheofactN (:,:,iblk), &
                                    stresspU  (:,:,iblk), stressmU  (:,:,iblk), &
                                    stress12T (:,:,iblk), strintxN  (:,:,iblk)  )
 
@@ -1225,7 +1229,7 @@
                                    indxNi      (:,iblk), indxNj      (:,iblk), &
                                    dxN       (:,:,iblk), dyN       (:,:,iblk), &
                                    dxT       (:,:,iblk), dyU       (:,:,iblk), &
-                                   narear    (:,:,iblk)                      , &
+                                   narear    (:,:,iblk), rheofactN (:,:,iblk), &
                                    stresspT  (:,:,iblk), stressmT  (:,:,iblk), &
                                    stress12U (:,:,iblk), strintyN  (:,:,iblk)  )
 
@@ -1283,6 +1287,7 @@
             call dyn_haloUpdate (halo_info,          halo_info_mask,    &
                                  field_loc_NEcorner, field_type_vector, &
                                  uvel, vvel)
+            call ice_restoring_halo(setfld='velocity')
 
          enddo                     ! subcycling
 
@@ -2186,14 +2191,14 @@
 ! elastic-viscous-plastic sea ice model formulated on Arakawa B and C grids.
 ! Ocean Model., 27, 174-184.
 
-      subroutine div_stress_Ex(nx_block, ny_block, &
-                                         icell   , &
-                               indxi   , indxj   , &
-                               dxE     , dyE     , &
-                               dxU     , dyT     , &
-                               arear   ,           &
-                               stressp , stressm , &
-                               stress12,           &
+      subroutine div_stress_Ex(nx_block, ny_block , &
+                                         icell    , &
+                               indxi   , indxj    , &
+                               dxE     , dyE      , &
+                               dxU     , dyT      , &
+                               arear   , rheofactE, &
+                               stressp , stressm  , &
+                               stress12,            &
                                strintx )
 
 
@@ -2210,7 +2215,8 @@
          dyE     , & ! height of E or N-cell through the middle (m)
          dxU     , & ! width of T or U-cell through the middle (m)
          dyT     , & ! height of T or U-cell through the middle (m)
-         arear       ! earear or narear
+         arear   , & ! earear or narear
+         rheofactE   ! mult. factor = 1, set to 0 if aiE <= rheo_area_min
 
       real (kind=dbl_kind), optional, dimension (nx_block,ny_block), intent(in) :: &
          stressp , & ! stressp  (U or T) used for strintx calculation
@@ -2230,7 +2236,7 @@
       do ij = 1, icell
          i = indxi(ij)
          j = indxj(ij)
-         strintx(i,j) = arear(i,j) * &
+         strintx(i,j) = rheofactE(i,j) * arear(i,j) * &
               ( p5 * dyE(i,j)  * ( stressp(i+1,j  )  - stressp (i  ,j  ) ) &
               + (p5/ dyE(i,j)) * ( (dyT(i+1,j  )**2) * stressm (i+1,j  )   &
                                   -(dyT(i  ,j  )**2) * stressm (i  ,j  ) ) &
@@ -2241,14 +2247,15 @@
       end subroutine div_stress_Ex
 
 !=======================================================================
-      subroutine div_stress_Ey(nx_block, ny_block, &
-                                         icell   , &
-                               indxi   , indxj   , &
-                               dxE     , dyE     , &
-                               dxU     , dyT     , &
-                               arear   ,           &
-                               stressp , stressm , &
-                               stress12,           &
+
+      subroutine div_stress_Ey(nx_block, ny_block , &
+                                         icell    , &
+                               indxi   , indxj    , &
+                               dxE     , dyE      , &
+                               dxU     , dyT      , &
+                               arear   , rheofactE, &
+                               stressp , stressm  , &
+                               stress12,            &
                                strinty )
 
       integer (kind=int_kind), intent(in) :: &
@@ -2264,7 +2271,8 @@
          dyE     , & ! height of E or N-cell through the middle (m)
          dxU     , & ! width of T or U-cell through the middle (m)
          dyT     , & ! height of T or U-cell through the middle (m)
-         arear         ! earear or narear
+         arear   , & ! earear or narear
+         rheofactE   ! mult. factor = 1, set to 0 if aiE <= rheo_area_min
 
       real (kind=dbl_kind), optional, dimension (nx_block,ny_block), intent(in) :: &
          stressp , & ! stressp  (U or T) used for strinty calculation
@@ -2284,7 +2292,7 @@
       do ij = 1, icell
          i = indxi(ij)
          j = indxj(ij)
-         strinty(i,j) = arear(i,j) * &
+         strinty(i,j) = rheofactE(i,j) * arear(i,j) * &
               ( p5 * dxE(i,j)  * ( stressp(i  ,j  )  - stressp (i  ,j-1) ) &
               - (p5/ dxE(i,j)) * ( (dxU(i  ,j  )**2) * stressm (i  ,j  )   &
                                   -(dxU(i  ,j-1)**2) * stressm (i  ,j-1) ) &
@@ -2295,14 +2303,15 @@
       end subroutine div_stress_Ey
 
 !=======================================================================
-      subroutine div_stress_Nx(nx_block, ny_block, &
-                                         icell   , &
-                               indxi   , indxj   , &
-                               dxN     , dyN     , &
-                               dxT     , dyU     , &
-                               arear   ,           &
-                               stressp , stressm , &
-                               stress12,           &
+
+      subroutine div_stress_Nx(nx_block, ny_block , &
+                                         icell    , &
+                               indxi   , indxj    , &
+                               dxN     , dyN      , &
+                               dxT     , dyU      , &
+                               arear   , rheofactN, &
+                               stressp , stressm  , &
+                               stress12,            &
                                strintx )
 
       integer (kind=int_kind), intent(in) :: &
@@ -2318,7 +2327,8 @@
          dyN     , & ! height of E or N-cell through the middle (m)
          dxT     , & ! width of T or U-cell through the middle (m)
          dyU     , & ! height of T or U-cell through the middle (m)
-         arear       ! earear or narear
+         arear   , & ! earear or narear
+         rheofactN   ! mult. factor = 1, set to 0 if aiN <= rheo_area_min
 
       real (kind=dbl_kind), optional, dimension (nx_block,ny_block), intent(in) :: &
          stressp , & ! stressp  (U or T) used for strintx calculation
@@ -2338,7 +2348,7 @@
       do ij = 1, icell
          i = indxi(ij)
          j = indxj(ij)
-         strintx(i,j) = arear(i,j) * &
+         strintx(i,j) = rheofactN(i,j) * arear(i,j) * &
               ( p5 * dyN(i,j)  * ( stressp(i  ,j  )  - stressp (i-1,j  ) ) &
               + (p5/ dyN(i,j)) * ( (dyU(i  ,j  )**2) * stressm (i  ,j  )   &
                                   -(dyU(i-1,j  )**2) * stressm (i-1,j  ) ) &
@@ -2349,14 +2359,15 @@
       end subroutine div_stress_Nx
 
 !=======================================================================
-      subroutine div_stress_Ny(nx_block, ny_block, &
-                                         icell   , &
-                               indxi   , indxj   , &
-                               dxN     , dyN     , &
-                               dxT     , dyU     , &
-                               arear   ,           &
-                               stressp , stressm , &
-                               stress12,           &
+
+      subroutine div_stress_Ny(nx_block, ny_block , &
+                                         icell    , &
+                               indxi   , indxj    , &
+                               dxN     , dyN      , &
+                               dxT     , dyU      , &
+                               arear   , rheofactN, &
+                               stressp , stressm  , &
+                               stress12,            &
                                strinty )
 
       integer (kind=int_kind), intent(in) :: &
@@ -2372,7 +2383,8 @@
          dyN     , & ! height of E or N-cell through the middle (m)
          dxT     , & ! width of T or U-cell through the middle (m)
          dyU     , & ! height of T or U-cell through the middle (m)
-         arear       ! earear or narear
+         arear   , & ! earear or narear
+         rheofactN   ! mult. factor = 1, set to 0 if aiN <= rheo_area_min
 
       real (kind=dbl_kind), optional, dimension (nx_block,ny_block), intent(in) :: &
          stressp , & ! stressp  (U or T) used for strinty calculation
@@ -2392,7 +2404,7 @@
       do ij = 1, icell
          i = indxi(ij)
          j = indxj(ij)
-         strinty(i,j) = arear(i,j) * &
+         strinty(i,j) = rheofactN(i,j) * arear(i,j) * &
               ( p5 * dxN(i,j)  * ( stressp(i  ,j+1)  - stressp (i  ,j  ) ) &
               - (p5/ dxN(i,j)) * ( (dxT(i  ,j+1)**2) * stressm (i  ,j+1)   &
                                   -(dxT(i  ,j  )**2) * stressm (i  ,j  ) ) &

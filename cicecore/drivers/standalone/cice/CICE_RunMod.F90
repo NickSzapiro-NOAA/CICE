@@ -142,7 +142,7 @@
       use ice_calendar, only: dt, dt_dyn, ndtd, diagfreq, write_restart, istep
       use ice_diagnostics, only: init_mass_diags, runtime_diags, debug_model, debug_ice
       use ice_diagnostics_bgc, only: hbrine_diags, bgc_diags
-      use ice_domain, only: halo_info, nblocks
+      use ice_domain, only: halo_info, nblocks, num_set_boundary_flds
       use ice_dyn_eap, only: write_restart_eap
       use ice_dyn_shared, only: kdyn, kridge
       use ice_flux, only: scale_factor, init_history_therm, &
@@ -156,7 +156,8 @@
           write_restart_iso, write_restart_bgc, write_restart_hbrine, &
           write_restart_snow
       use ice_restart_driver, only: dumpfile
-      use ice_restoring, only: restore_ice, ice_HaloRestore
+      use ice_restoring, only: restore_ice, ice_restoring_getdata, &
+          ice_restoring_interior
       use ice_step_mod, only: prep_radiation, step_therm1, step_therm2, &
           update_state, step_dyn_horiz, step_dyn_ridge, step_radiation, &
           biogeochemistry, step_prep, step_dyn_wave, step_snow
@@ -203,7 +204,7 @@
       ! restoring on grid boundaries
       !-----------------------------------------------------------------
 
-         if (restore_ice) call ice_HaloRestore
+      if (restore_ice .or. num_set_boundary_flds > 0) call ice_restoring_getdata()
 
       !-----------------------------------------------------------------
       ! initialize diagnostics and save initial state values
@@ -264,6 +265,9 @@
             !$OMP END PARALLEL DO
          endif ! ktherm > 0
 
+         ! interior restoring
+         call ice_restoring_interior('state')
+
          ! clean up, update tendency diagnostics
          offset = dt
          call update_state (dt=dt, daidt=daidtt, dvidt=dvidtt, dvsdt=dvsdtt, &
@@ -291,6 +295,10 @@
                   call debug_ice (iblk, plabeld)
                enddo ! iblk
             endif
+
+            ! restoring, need to watch ndtd loop, multiple restoring calls 
+            ! of the same fields per timestep are incorrect
+            if (k == ndtd) call ice_restoring_interior('velocity')
 
             ! ridging
             !$OMP PARALLEL DO PRIVATE(iblk) SCHEDULE(runtime)
@@ -435,14 +443,13 @@
           fswthru_ai, fhocn, scale_factor, snowfrac, &
           fswthru, fswthru_vdr, fswthru_vdf, fswthru_idr, fswthru_idf, &
           swvdr, swidr, swvdf, swidf, Tf, Tair, Qa, strairxT, strairyT, &
-          fsens, flat, fswabs, flwout, evap, Tref, Qref, &
+          fsens, flat, fswabs, fsw, fswup, flwout, evap, Tref, Qref, &
           scale_fluxes, frzmlt_init, frzmlt
       use ice_flux_bgc, only: faero_ocn, fiso_ocn, Qref_iso, fiso_evap, &
           flux_bio, flux_bio_ai
       use ice_grid, only: tmask
-      use ice_state, only: aicen, aice
+      use ice_state, only: aicen, aice, aice_init
 #ifdef CICE_IN_NEMO
-      use ice_state, only: aice_init
       use ice_flux, only: flatn_f, fsurfn_f
 #endif
       use ice_step_mod, only: ocean_mixed_layer
@@ -585,10 +592,18 @@
             alidf_ai  (i,j,iblk) = alidf  (i,j,iblk)
             alvdr_ai  (i,j,iblk) = alvdr  (i,j,iblk)
             alidr_ai  (i,j,iblk) = alidr  (i,j,iblk)
+
+
+      !----------------------------------------------------------------
+      ! Store fluxes before scaling by aice
+      !----------------------------------------------------------------
+
             fresh_ai  (i,j,iblk) = fresh  (i,j,iblk)
             fsalt_ai  (i,j,iblk) = fsalt  (i,j,iblk)
             fhocn_ai  (i,j,iblk) = fhocn  (i,j,iblk)
             fswthru_ai(i,j,iblk) = fswthru(i,j,iblk)
+            fswup     (i,j,iblk) = aice_init(i,j,iblk) &
+                                 * fsw    (i,j,iblk) - fswabs(i,j,iblk)
 
             if (nbtrcr > 0) then
             do k = 1, nbtrcr

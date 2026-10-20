@@ -73,10 +73,10 @@ contains
 
     use ice_arrays_column    , only: hin_max, c_hi_range
     use ice_arrays_column    , only: floe_rad_l, floe_rad_c, floe_binwidth, c_fsd_range
-    use ice_calendar         , only: dt, dt_dyn, istep, istep1, write_ic, init_calendar, calendar
+    use ice_calendar         , only: dt, init_calendar, calendar
     use ice_communicate      , only: my_task, master_task
     use ice_diagnostics      , only: init_diags
-    use ice_domain_size      , only: ncat, nfsd, nfreq
+    use ice_domain_size      , only: nfreq
     use ice_dyn_eap          , only: init_eap
     use ice_dyn_evp          , only: init_evp
     use ice_dyn_vp           , only: init_vp
@@ -91,7 +91,8 @@ contains
     use ice_restart_shared   , only: restart, runtype
     use ice_init             , only: input_data, init_state
     use ice_init_column      , only: init_thermo_vertical, init_shortwave, init_zbgc
-    use ice_restoring        , only: ice_HaloRestore_init
+    use ice_restoring        , only: restore_ice, ice_restoring_init
+    use ice_domain           , only: num_set_boundary_flds
     use ice_timers           , only: timer_total, init_ice_timers, ice_timer_start
     use ice_transport_driver , only: init_transport
     use ice_arrays_column    , only: wavefreq, dwavefreq
@@ -142,7 +143,7 @@ contains
 
     call init_state           ! initialize the ice state
     call init_transport       ! initialize horizontal transport
-    call ice_HaloRestore_init ! restored boundary conditions
+    if (restore_ice .or. num_set_boundary_flds > 0) call ice_restoring_init ! restoring on boundary or interior
 
     call icepack_query_parameters(skl_bgc_out=skl_bgc, z_tracers_out=z_tracers, &
          wave_spec_out=wave_spec, snw_aging_table_out=snw_aging_table)
@@ -214,7 +215,7 @@ contains
     use ice_calendar, only: calendar
     use ice_constants, only: c0
     use ice_domain, only: nblocks
-    use ice_domain_size, only: ncat, n_iso, n_aero, nfsd, nslyr
+    use ice_domain_size, only: n_iso, n_aero, nfsd, nslyr
     use ice_dyn_eap, only: read_restart_eap
     use ice_dyn_shared, only: kdyn
     use ice_flux, only: Tf

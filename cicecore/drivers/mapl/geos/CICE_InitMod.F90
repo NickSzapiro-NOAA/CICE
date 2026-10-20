@@ -38,7 +38,7 @@ contains
     use ice_init_column   , only: input_zbgc, count_tracers
     use ice_grid          , only: init_grid1, alloc_grid
     !use ice_calendar      , only: set_time_step
-    use ice_domain        , only: init_domain_blocks
+    use ice_domain        , only: init_domain_blocks, num_set_boundary_flds
     use ice_arrays_column , only: alloc_arrays_column
     use ice_state         , only: alloc_state
     !use ice_dyn_shared    , only: alloc_dyn_shared
@@ -145,10 +145,11 @@ contains
     use ice_forcing_bgc      , only: get_forcing_bgc, get_atm_bgc
     use ice_forcing_bgc      , only: faero_default, alloc_forcing_bgc, fiso_default
     use ice_history          , only: init_hist, accum_hist
+    use ice_history_write, only: ice_read_hist
     use ice_restart_shared   , only: restart, runtype
     use ice_init             , only: input_data, init_state
     use ice_init_column      , only: init_thermo_vertical, init_shortwave, init_zbgc
-    use ice_restoring        , only: ice_HaloRestore_init
+    use ice_restoring        , only: restore_ice, ice_restoring_init
     use ice_timers           , only: timer_total, init_ice_timers, ice_timer_start
     use ice_transport_driver , only: init_transport
 
@@ -205,7 +206,7 @@ contains
 
     call init_state           ! initialize the ice state
     call init_transport       ! initialize horizontal transport
-    call ice_HaloRestore_init ! restored boundary conditions
+    if (restore_ice .or. num_set_boundary_flds > 0) call ice_restoring_init ! restoring on boundary or interior
 
     call icepack_query_parameters(skl_bgc_out=skl_bgc, z_tracers_out=z_tracers, &
          wave_spec_out=wave_spec, snw_aging_table_out=snw_aging_table)
@@ -262,6 +263,7 @@ contains
     if (write_ic) then
        call accum_hist(dt)  ! write initial conditions
     end if
+    call ice_read_hist  ! read history restarts
 
     call dealloc_grid         ! deallocate temporary grid arrays
 

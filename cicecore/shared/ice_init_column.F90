@@ -166,8 +166,7 @@
           albsnon, alvdrn, alidrn, alvdfn, alidfn, fswsfcn, &
           fswthrun, fswthrun_vdr, fswthrun_vdf, fswthrun_idr, fswthrun_idf, &
           fswthrun_uvrdr, fswthrun_uvrdf, fswthrun_pardr, fswthrun_pardf, &
-          fswintn, albpndn, apeffn, trcrn_sw, dhsn, ffracn, snowfracn, &
-          swgrid, igrid
+          fswintn, albpndn, apeffn, trcrn_sw, dhsn, ffracn, snowfracn
       use ice_blocks, only: block, get_block
       use ice_calendar, only: dt, calendar_type, &
           days_per_year, nextsw_cday, yday, msec
@@ -677,7 +676,7 @@
 
          ! initialize floe size distribution the same in every column and category
          call icepack_init_fsd(ice_ic = ice_ic, &
-            afsd          = afsd)             ! floe size distribution
+                               afsd   = afsd)             ! floe size distribution
 
          do iblk = 1, max_blocks
             do j = 1, ny_block
@@ -744,7 +743,7 @@
 
       use ice_arrays_column, only: zfswin, trcrn_sw, &
           ocean_bio_all, ice_bio_net, snow_bio_net, &
-          cgrid, igrid, bphi, iDi, bTiz, iki
+          bphi, iDi, bTiz, iki
       use ice_blocks, only: block, get_block
       use ice_domain, only: nblocks, blocks_ice
       use ice_flux, only: sss
@@ -924,8 +923,7 @@
 
       subroutine init_hbrine()
 
-      use ice_arrays_column, only: first_ice, bgrid, igrid, cgrid, &
-          icgrid, swgrid
+      use ice_arrays_column, only: first_ice
       use ice_state, only: trcrn
 
       real (kind=dbl_kind) :: phi_snow
@@ -1444,6 +1442,13 @@
          endif
       endif
 
+      if (restore_bgc) then
+         if (my_task == master_task) then
+            write(nu_diag,*) 'ERROR: restore_bgc is deprecated, do not set it to true'
+            abort_flag = 125
+         endif
+      endif
+
       if (.not. tr_brine) then
          if (solve_zbgc) then
             if (my_task == master_task) then
@@ -1638,7 +1643,6 @@
         if (skl_bgc) then
 
          write(nu_diag,1030) ' bgc_flux_type             = ', bgc_flux_type
-         write(nu_diag,1010) ' restore_bgc               = ', restore_bgc
 
         elseif (z_tracers) then
 
@@ -2545,7 +2549,7 @@
          R_C2N  (icepack_max_algae), & ! algal C to N (mole/mole)
          R_chl2N(icepack_max_algae), & ! 3 algal chlorophyll to N (mg/mmol)
          stat=ierr)
-      if (ierr/=0) call abort_ice(subname//' Out of Memory')
+      if (ierr/=0) call abort_ice(subname//' Out of Memory',file=__FILE__, line=__LINE__)
 
       R_C2N(1)     = ratio_C2N_diatoms
       R_C2N(2)     = ratio_C2N_sp
@@ -2874,7 +2878,7 @@
          write (nu_diag,*) subname,' '
          write (nu_diag,*) subname,'nbtrcr > icepack_max_nbtrcr'
          write (nu_diag,*) subname,'nbtrcr, icepack_max_nbtrcr:',nbtrcr, icepack_max_nbtrcr
-         call abort_ice (subname//'ERROR: nbtrcr > icepack_max_nbtrcr')
+         call abort_ice (subname//'ERROR: nbtrcr > icepack_max_nbtrcr',file=__FILE__, line=__LINE__)
       endif
       if (.NOT. dEdd_algae) nbtrcr_sw = 1
 

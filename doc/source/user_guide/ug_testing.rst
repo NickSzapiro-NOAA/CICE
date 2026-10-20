@@ -285,7 +285,7 @@ To run the test::
 
 .. _testsuites:
 
-Test suites
+Test Suites
 ------------
 
 Test suites support running multiple tests specified via
@@ -448,11 +448,13 @@ which means by default the test suite builds and submits the jobs.  By defining 
 By leveraging the **cice.setup** command line arguments ``--setup-only``, ``--setup-build``, and ``--setup-build-run`` as well as the environment variables SUITE_BUILD, SUITE_RUN, and SUITE_SUBMIT, users can run **cice.setup** and **suite.submit** in various combinations to quickly setup, setup and build, submit, resubmit, run interactively, or rebuild and resubmit full testsuites quickly and easily.  See :ref:`examplesuites` for an example.
 
 The script **create_fails.csh** will process the output from results.csh and generate a new 
-test suite file, **fails.ts**, from the failed tests.  
-**fails.ts** can then be edited and passed into ``cice.setup --suite fails.ts ...`` to rerun 
-subsets of failed tests to more efficiently move thru the development, testing, and 
-validation process.  However, a full test suite should be run on the final development
-version of the code.
+test suite file, **fails.ts**, from the failed tests.   It will also generate a script called
+**rerun.csh** for runs that failed to complete.  **rerun.csh** can be executed from the testsuite directory and
+runs that failed to complete will be resubmitted.
+**fails.ts** can be passed into ``cice.setup --suite fails.ts ...`` to setup a new test
+suite based on the failed tests to more efficiently move thru the development, testing, and 
+validation process.  However, ultimately, once all code changes are complete, a full test suite 
+should be run on the final development version of the code.
 
 To report the test results, as is required for Pull Requests to be accepted into 
 the main the CICE Consortium code see :ref:`testreporting`.
@@ -735,11 +737,13 @@ The following are brief descriptions of some of the current unit tests,
    both sets of software are tested independently and correctness is verified.
  - **calchk** is a unit test that exercises the CICE calendar over 100,000 years and verifies correctness.
    This test does not depend on the CICE initialization.
+ - **gathscatchk** is a unit test that exercises the CICE gather/scatter methods and verifies results.
  - **gridavgchk** is a unit test that exercises the CICE grid_average_X2Y methods and verifies results.
  - **halochk** is a unit test that exercises the CICE haloUpdate methods and verifies results.
  - **helloworld** is a simple test that writes out helloworld and uses no CICE infrastructure.
    This tests exists to demonstrate how to build a unit test by specifying the object files directly
    in the Makefile
+ - **mpif08** is a simple standalone unit test that checks whether the mpi_f08 module is available.
  - **optargs** is a unit test that tests passing optional arguments down a calling tree and verifying
    that the optional attribute is preserved correctly.
  - **opticep** is a cice test that turns off the icepack optional arguments passed into icepack.  This
